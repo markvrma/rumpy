@@ -4,6 +4,8 @@
 //! spec — `cargo test` starts red and goes green milestone by milestone.
 //! See README.md for the roadmap and reading list.
 
+use std::fmt;
+
 /// Error for any shape-level failure. All fallible ops return
 /// `Result<_, ShapeError>` — no panicking APIs in the library itself.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,3 +18,21 @@ pub enum ShapeError {
     /// Axis argument >= number of dimensions.
     AxisOutOfBounds { axis: usize, ndim: usize },
 }
+
+impl fmt::Display for ShapeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ShapeError::SizeMismatch { expected, got } => {
+                write!(f, "size mismatch: expected {expected} elements, got {got}")
+            }
+            ShapeError::Incompatible { a, b } => {
+                write!(f, "incompatible shapes: {a:?} vs {b:?}")
+            }
+            ShapeError::AxisOutOfBounds { axis, ndim } => {
+                write!(f, "axis {axis} out of bounds for {ndim}-d array")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ShapeError {}
