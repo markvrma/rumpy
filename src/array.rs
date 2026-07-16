@@ -40,6 +40,24 @@ impl Array {
         strides
     }
 
+    /// Array of the given shape, all elements `0.0`.
+    pub fn zeros(shape: &[usize]) -> Array {
+        Array {
+            data: vec![0.0; shape.iter().product()],
+            shape: shape.to_vec(),
+            strides: Self::strides_for(shape),
+        }
+    }
+
+    /// Array of the given shape, all elements `1.0`.
+    pub fn ones(shape: &[usize]) -> Array {
+        Array {
+            data: vec![1.0; shape.iter().product()],
+            shape: shape.to_vec(),
+            strides: Self::strides_for(shape),
+        }
+    }
+
     pub fn shape(&self) -> &[usize] {
         &self.shape
     }
