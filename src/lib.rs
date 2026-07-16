@@ -4,6 +4,10 @@
 //! spec — `cargo test` starts red and goes green milestone by milestone.
 //! See README.md for the roadmap and reading list.
 
+mod array;
+
+pub use array::Array;
+
 use std::fmt;
 
 /// Error for any shape-level failure. All fallible ops return
