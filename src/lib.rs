@@ -36,3 +36,13 @@ impl fmt::Display for ShapeError {
 }
 
 impl std::error::Error for ShapeError {}
+
+/// Test helper: panic unless `a` and `b` are within `eps` of each other.
+/// Floats accumulate rounding, so tests never use exact `assert_eq!` on
+/// computed values — this is the whole float-comparison story, no crate needed.
+pub fn assert_close(a: f64, b: f64, eps: f64) {
+    assert!(
+        (a - b).abs() <= eps,
+        "not close: {a} vs {b} (eps {eps})"
+    );
+}
