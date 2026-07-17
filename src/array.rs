@@ -11,6 +11,8 @@
 //!   (NumPy counts bytes — same idea, simpler arithmetic).
 //! - 0-d arrays (scalars) are out of scope.
 
+use crate::ShapeError;
+
 /// N-dimensional array of `f64` owning a flat, contiguous, C-order buffer.
 ///
 /// Invariant every constructor must uphold:
@@ -77,6 +79,23 @@ impl Array {
             shape: vec![n],
             strides: vec![1],
         }
+    }
+
+    /// Take ownership of a flat buffer and give it a shape.
+    /// Errors with `SizeMismatch` if the element counts disagree.
+    pub fn from_vec(data: Vec<f64>, shape: &[usize]) -> Result<Array, ShapeError> {
+        let expected: usize = shape.iter().product();
+        if expected != data.len() {
+            return Err(ShapeError::SizeMismatch {
+                expected,
+                got: data.len(),
+            });
+        }
+        Ok(Array {
+            data,
+            strides: Self::strides_for(shape),
+            shape: shape.to_vec(),
+        })
     }
 
     pub fn shape(&self) -> &[usize] {
@@ -166,6 +185,21 @@ mod tests {
         let a = Array::arange(0.0, 1.0, 0.25);
         assert_eq!(a.len(), 4);
         assert_close(a.get(&[3]).unwrap(), 0.75, EPS);
+    }
+
+    #[test]
+    fn from_vec_ok() {
+        let a = Array::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], &[2, 3]).unwrap();
+        assert_eq!(a.shape(), &[2, 3]);
+        // C-order: row 0 is [1, 2, 3], row 1 is [4, 5, 6]
+        assert_eq!(a.get(&[0, 2]), Some(3.0));
+        assert_eq!(a.get(&[1, 0]), Some(4.0));
+    }
+
+    #[test]
+    fn from_vec_size_mismatch() {
+        let err = Array::from_vec(vec![1.0, 2.0, 3.0], &[2, 2]).unwrap_err();
+        assert_eq!(err, crate::ShapeError::SizeMismatch { expected: 4, got: 3 });
     }
 
     #[test]
