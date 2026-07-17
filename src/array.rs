@@ -70,6 +70,30 @@ impl Array {
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
+
+    /// Flat-buffer offset of a multi-index, using strides:
+    /// `offset = sum(index[i] * strides[i])`.
+    /// `None` if `index.len() != ndim` or any coordinate is out of bounds.
+    pub(crate) fn offset(&self, index: &[usize]) -> Option<usize> {
+        if index.len() != self.shape.len() {
+            return None;
+        }
+        let mut off = 0;
+        for (axis, &i) in index.iter().enumerate() {
+            if i >= self.shape[axis] {
+                return None;
+            }
+            off += i * self.strides[axis];
+        }
+        Some(off)
+    }
+
+    /// Element at a multi-index, `None` when out of bounds — the fallible,
+    /// `Result`-friendly access path (Rust's `Index` trait can't be fallible,
+    /// so we don't use it; see README decisions table).
+    pub fn get(&self, index: &[usize]) -> Option<f64> {
+        self.offset(index).map(|o| self.data[o])
+    }
 }
 
 // ---------------------------------------------------------------------- tests
@@ -90,5 +114,28 @@ mod tests {
         assert_eq!(Array::strides_for(&[2, 3, 4]), vec![12, 4, 1]);
         assert_eq!(Array::strides_for(&[5]), vec![1]);
         assert_eq!(Array::strides_for(&[4, 7]), vec![7, 1]);
+    }
+
+    #[test]
+    fn zeros_shape_and_values() {
+        let a = Array::zeros(&[2, 3]);
+        assert_eq!(a.shape(), &[2, 3]);
+        assert_eq!(a.len(), 6);
+        assert_eq!(a.get(&[1, 2]), Some(0.0));
+    }
+
+    #[test]
+    fn ones_values() {
+        let a = Array::ones(&[3]);
+        assert_eq!(a.get(&[0]), Some(1.0));
+        assert_eq!(a.get(&[2]), Some(1.0));
+    }
+
+    #[test]
+    fn get_out_of_bounds_and_wrong_ndim() {
+        let a = Array::zeros(&[2, 3]);
+        assert_eq!(a.get(&[2, 0]), None); // row out of range
+        assert_eq!(a.get(&[0, 3]), None); // col out of range
+        assert_eq!(a.get(&[0]), None); // wrong ndim
     }
 }
