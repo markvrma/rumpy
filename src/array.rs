@@ -58,6 +58,27 @@ impl Array {
         }
     }
 
+    /// 1-d array: `start, start+step, ...` up to but excluding `stop`.
+    /// Mirrors `numpy.arange`. Contract is "close enough": exact for
+    /// integer-valued steps; float steps accumulate rounding just like NumPy's.
+    pub fn arange(start: f64, stop: f64, step: f64) -> Array {
+        // same count formula numpy uses. step 0 or a backwards range gives a
+        // non-finite / negative count, which we clamp to an empty array.
+        let count = ((stop - start) / step).ceil();
+        let n = if count.is_finite() && count > 0.0 {
+            count as usize
+        } else {
+            0
+        };
+        // start + i*step, not a running += , so the error doesn't accumulate
+        let data: Vec<f64> = (0..n).map(|i| start + i as f64 * step).collect();
+        Array {
+            data,
+            shape: vec![n],
+            strides: vec![1],
+        }
+    }
+
     pub fn shape(&self) -> &[usize] {
         &self.shape
     }
@@ -129,6 +150,22 @@ mod tests {
         let a = Array::ones(&[3]);
         assert_eq!(a.get(&[0]), Some(1.0));
         assert_eq!(a.get(&[2]), Some(1.0));
+    }
+
+    #[test]
+    fn arange_integer_step_is_exact() {
+        let a = Array::arange(0.0, 5.0, 1.0);
+        assert_eq!(a.shape(), &[5]);
+        for i in 0..5 {
+            assert_eq!(a.get(&[i]), Some(i as f64));
+        }
+    }
+
+    #[test]
+    fn arange_float_step_close_enough() {
+        let a = Array::arange(0.0, 1.0, 0.25);
+        assert_eq!(a.len(), 4);
+        assert_close(a.get(&[3]).unwrap(), 0.75, EPS);
     }
 
     #[test]
