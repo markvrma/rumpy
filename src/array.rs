@@ -142,6 +142,17 @@ impl Array {
         let off = self.offset(index)?;
         Some(&mut self.data[off])
     }
+
+    /// Same data, new shape. Errors with `SizeMismatch` when counts differ.
+    ///
+    /// ponytail: copy-based (clone the buffer). NumPy reshapes contiguous
+    /// arrays without copying — no-copy views are the named stretch goal, and
+    /// they'd force every op after this to handle non-contiguous layouts.
+    pub fn reshape(&self, new_shape: &[usize]) -> Result<Array, ShapeError> {
+        // the buffer is already c-order, so a reshape is just new shape +
+        // new strides over the same values. from_vec re-checks the count.
+        Array::from_vec(self.data.clone(), new_shape)
+    }
 }
 
 // ---------------------------------------------------------------------- tests
@@ -224,5 +235,24 @@ mod tests {
         *a.get_mut(&[1, 1]).unwrap() = 7.5;
         assert_eq!(a.get(&[1, 1]), Some(7.5));
         assert_eq!(a.get(&[0, 0]), Some(0.0));
+    }
+
+    // ------------------------------------------------------------------- M2
+
+    #[test]
+    fn reshape_preserves_c_order() {
+        let a = Array::arange(1.0, 7.0, 1.0); // [1, 2, 3, 4, 5, 6]
+        let b = a.reshape(&[2, 3]).unwrap();
+        assert_eq!(b.get(&[0, 0]), Some(1.0));
+        assert_eq!(b.get(&[1, 2]), Some(6.0));
+        let c = b.reshape(&[3, 2]).unwrap();
+        assert_eq!(c.get(&[2, 1]), Some(6.0));
+    }
+
+    #[test]
+    fn reshape_size_mismatch() {
+        let a = Array::zeros(&[2, 3]);
+        let err = a.reshape(&[4, 2]).unwrap_err();
+        assert_eq!(err, crate::ShapeError::SizeMismatch { expected: 8, got: 6 });
     }
 }
