@@ -128,6 +128,19 @@ impl Array {
         Some(off)
     }
 
+    /// odometer step: bump a C-order multi-index by one, rightmost axis first.
+    /// returns false once it rolls over, which is how the walk loops know to stop.
+    pub(crate) fn next_index(index: &mut [usize], shape: &[usize]) -> bool {
+        for axis in (0..shape.len()).rev() {
+            index[axis] += 1;
+            if index[axis] < shape[axis] {
+                return true;
+            }
+            index[axis] = 0;
+        }
+        false
+    }
+
     /// Element at a multi-index, `None` when out of bounds — the fallible,
     /// `Result`-friendly access path (Rust's `Index` trait can't be fallible,
     /// so we don't use it; see README decisions table).
