@@ -166,6 +166,30 @@ impl Array {
         // new strides over the same values. from_vec re-checks the count.
         Array::from_vec(self.data.clone(), new_shape)
     }
+
+    /// Reverse the axes (2-d: rows become columns). Copy-based: builds a fresh
+    /// C-order buffer in transposed order. NumPy instead just swaps shape and
+    /// strides — zero copy — which is a great README design-note contrast.
+    pub fn transpose(&self) -> Array {
+        let mut out_shape = self.shape.clone();
+        out_shape.reverse();
+        let mut out = Array::zeros(&out_shape);
+        if self.data.is_empty() {
+            return out;
+        }
+        // walk the output in C-order (so slot just counts up) and for each
+        // spot read the source at the reversed index. that's the whole trick.
+        let mut idx = vec![0usize; out_shape.len()];
+        let mut src = vec![0usize; out_shape.len()];
+        for slot in 0..out.data.len() {
+            for (axis, &i) in idx.iter().enumerate() {
+                src[out_shape.len() - 1 - axis] = i;
+            }
+            out.data[slot] = self.data[self.offset(&src).unwrap()];
+            Array::next_index(&mut idx, &out_shape);
+        }
+        out
+    }
 }
 
 // ---------------------------------------------------------------------- tests
@@ -267,5 +291,23 @@ mod tests {
         let a = Array::zeros(&[2, 3]);
         let err = a.reshape(&[4, 2]).unwrap_err();
         assert_eq!(err, crate::ShapeError::SizeMismatch { expected: 8, got: 6 });
+    }
+
+    #[test]
+    fn transpose_2d() {
+        let a = Array::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], &[2, 3]).unwrap();
+        let t = a.transpose();
+        assert_eq!(t.shape(), &[3, 2]);
+        for i in 0..2 {
+            for j in 0..3 {
+                assert_eq!(t.get(&[j, i]), a.get(&[i, j]));
+            }
+        }
+    }
+
+    #[test]
+    fn transpose_twice_is_identity() {
+        let a = Array::from_vec(vec![1.0, 2.0, 3.0, 4.0], &[2, 2]).unwrap();
+        assert_eq!(a.transpose().transpose(), a);
     }
 }
