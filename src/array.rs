@@ -134,6 +134,14 @@ impl Array {
     pub fn get(&self, index: &[usize]) -> Option<f64> {
         self.offset(index).map(|o| self.data[o])
     }
+
+    /// Mutable reference to an element. `set` for free:
+    /// `*a.get_mut(&[i, j]).unwrap() = 5.0;`
+    pub fn get_mut(&mut self, index: &[usize]) -> Option<&mut f64> {
+        // offset borrows self immutably, so it has to finish before we reborrow
+        let off = self.offset(index)?;
+        Some(&mut self.data[off])
+    }
 }
 
 // ---------------------------------------------------------------------- tests
@@ -208,5 +216,13 @@ mod tests {
         assert_eq!(a.get(&[2, 0]), None); // row out of range
         assert_eq!(a.get(&[0, 3]), None); // col out of range
         assert_eq!(a.get(&[0]), None); // wrong ndim
+    }
+
+    #[test]
+    fn get_mut_writes_through() {
+        let mut a = Array::zeros(&[2, 2]);
+        *a.get_mut(&[1, 1]).unwrap() = 7.5;
+        assert_eq!(a.get(&[1, 1]), Some(7.5));
+        assert_eq!(a.get(&[0, 0]), Some(0.0));
     }
 }
