@@ -53,6 +53,17 @@ impl Array {
         // no zero check: ieee754 already gives inf/nan, same as numpy
         zip_same(self, rhs, |x, y| x / y)
     }
+
+    /// Apply `f` to every element — the poor man's ufunc.
+    /// `a.map(f64::sqrt)` is rumpy's `np.sqrt(a)`.
+    pub fn map(&self, f: impl Fn(f64) -> f64) -> Array {
+        // shape is untouched, so we can hand the strides straight over
+        Array {
+            data: self.data.iter().map(|&x| f(x)).collect(),
+            shape: self.shape.clone(),
+            strides: self.strides.clone(),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------- tests
@@ -88,6 +99,13 @@ mod tests {
         assert_eq!(a.sub(&b).unwrap().get(&[0]), Some(6.0));
         assert_eq!(a.mul(&b).unwrap().get(&[1]), Some(18.0));
         assert_eq!(a.div(&b).unwrap().get(&[1]), Some(2.0));
+    }
+
+    #[test]
+    fn map_applies_everywhere() {
+        let a = arr(&[1.0, 4.0, 9.0], &[3]);
+        let r = a.map(f64::sqrt);
+        assert_close(r.get(&[2]).unwrap(), 3.0, EPS);
     }
 
     #[test]
