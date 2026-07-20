@@ -5,6 +5,7 @@
 //! See README.md for the roadmap and reading list.
 
 mod array;
+mod ops;
 
 pub use array::Array;
 
