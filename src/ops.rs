@@ -36,6 +36,23 @@ impl Array {
     pub fn add(&self, rhs: &Array) -> Result<Array, ShapeError> {
         zip_same(self, rhs, |x, y| x + y)
     }
+
+    /// Elementwise subtraction with broadcasting. Same plan as `add`.
+    pub fn sub(&self, rhs: &Array) -> Result<Array, ShapeError> {
+        zip_same(self, rhs, |x, y| x - y)
+    }
+
+    /// Elementwise multiplication with broadcasting. Same plan as `add`.
+    pub fn mul(&self, rhs: &Array) -> Result<Array, ShapeError> {
+        zip_same(self, rhs, |x, y| x * y)
+    }
+
+    /// Elementwise division with broadcasting. Same plan as `add`.
+    /// Division by zero follows IEEE 754 (inf / NaN), same as NumPy.
+    pub fn div(&self, rhs: &Array) -> Result<Array, ShapeError> {
+        // no zero check: ieee754 already gives inf/nan, same as numpy
+        zip_same(self, rhs, |x, y| x / y)
+    }
 }
 
 // ---------------------------------------------------------------------- tests
@@ -62,5 +79,25 @@ mod tests {
         let c = a.add(&b).unwrap();
         assert_eq!(c.get(&[0, 0]), Some(11.0));
         assert_eq!(c.get(&[1, 1]), Some(44.0));
+    }
+
+    #[test]
+    fn sub_mul_div_equal_shapes() {
+        let a = arr(&[8.0, 6.0], &[2]);
+        let b = arr(&[2.0, 3.0], &[2]);
+        assert_eq!(a.sub(&b).unwrap().get(&[0]), Some(6.0));
+        assert_eq!(a.mul(&b).unwrap().get(&[1]), Some(18.0));
+        assert_eq!(a.div(&b).unwrap().get(&[1]), Some(2.0));
+    }
+
+    #[test]
+    fn mismatched_shapes_error_without_broadcast() {
+        // [2,3] vs [4] is incompatible even under full broadcasting (M4).
+        let a = Array::zeros(&[2, 3]);
+        let b = Array::zeros(&[4]);
+        assert!(matches!(
+            a.add(&b),
+            Err(ShapeError::Incompatible { .. })
+        ));
     }
 }
