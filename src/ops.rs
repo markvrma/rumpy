@@ -54,6 +54,16 @@ impl Array {
         zip_same(self, rhs, |x, y| x / y)
     }
 
+    /// Add a scalar to every element. Infallible — no shapes to disagree.
+    pub fn add_scalar(&self, s: f64) -> Array {
+        self.map(|x| x + s)
+    }
+
+    /// Multiply every element by a scalar.
+    pub fn mul_scalar(&self, s: f64) -> Array {
+        self.map(|x| x * s)
+    }
+
     /// Apply `f` to every element — the poor man's ufunc.
     /// `a.map(f64::sqrt)` is rumpy's `np.sqrt(a)`.
     pub fn map(&self, f: impl Fn(f64) -> f64) -> Array {
@@ -99,6 +109,13 @@ mod tests {
         assert_eq!(a.sub(&b).unwrap().get(&[0]), Some(6.0));
         assert_eq!(a.mul(&b).unwrap().get(&[1]), Some(18.0));
         assert_eq!(a.div(&b).unwrap().get(&[1]), Some(2.0));
+    }
+
+    #[test]
+    fn scalar_ops() {
+        let a = arr(&[1.0, 2.0, 3.0], &[3]);
+        assert_eq!(a.add_scalar(10.0).get(&[2]), Some(13.0));
+        assert_eq!(a.mul_scalar(-2.0).get(&[0]), Some(-2.0));
     }
 
     #[test]
