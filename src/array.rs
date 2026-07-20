@@ -156,14 +156,24 @@ impl Array {
         Some(&mut self.data[off])
     }
 
+    // ------------------------------------------------------- M2: shape changes
+
     /// Same data, new shape. Errors with `SizeMismatch` when counts differ.
     ///
     /// ponytail: copy-based (clone the buffer). NumPy reshapes contiguous
     /// arrays without copying — no-copy views are the named stretch goal, and
     /// they'd force every op after this to handle non-contiguous layouts.
     pub fn reshape(&self, new_shape: &[usize]) -> Result<Array, ShapeError> {
-        // the buffer is already c-order, so a reshape is just new shape +
-        // new strides over the same values. from_vec re-checks the count.
+        // the buffer is already C-order, so a reshape is literally just new
+        // shape + new strides over the same values. check before cloning so a
+        // bad call doesn't pay for a copy it's going to throw away.
+        let expected: usize = new_shape.iter().product();
+        if expected != self.data.len() {
+            return Err(ShapeError::SizeMismatch {
+                expected,
+                got: self.data.len(),
+            });
+        }
         Array::from_vec(self.data.clone(), new_shape)
     }
 
