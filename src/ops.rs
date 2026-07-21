@@ -218,4 +218,13 @@ mod tests {
         assert_eq!(a.min(), Some(1.0));
         assert_eq!(a.max(), Some(6.0));
     }
+
+    #[test]
+    fn empty_reductions() {
+        let a = Array::zeros(&[0]);
+        assert_eq!(a.sum(), 0.0);
+        assert!(a.mean().is_nan());
+        assert_eq!(a.min(), None);
+        assert_eq!(a.max(), None);
+    }
 }
