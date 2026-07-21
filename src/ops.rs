@@ -5,6 +5,7 @@
 //! - What a ufunc is (M3 context): https://numpy.org/doc/stable/reference/ufuncs.html
 
 use crate::{Array, ShapeError};
+use std::ops::{Add, Div, Mul, Sub};
 
 /// m3 version: shapes have to match exactly. broadcasting is m4's problem.
 fn zip_same(a: &Array, b: &Array, f: impl Fn(f64, f64) -> f64) -> Result<Array, ShapeError> {
@@ -76,6 +77,39 @@ impl Array {
     }
 }
 
+// Operator sugar so `&a + &b` reads like NumPy. The library API is
+// Result-everywhere; only these operators unwrap, mirroring how `v[i]`
+// panics while `v.get(i)` doesn't. Borrowed impls only — owned variants
+// are mechanical additions if call sites ever want them.
+
+impl Add for &Array {
+    type Output = Array;
+    fn add(self, rhs: &Array) -> Array {
+        Array::add(self, rhs).expect("shape mismatch in +")
+    }
+}
+
+impl Sub for &Array {
+    type Output = Array;
+    fn sub(self, rhs: &Array) -> Array {
+        Array::sub(self, rhs).expect("shape mismatch in -")
+    }
+}
+
+impl Mul for &Array {
+    type Output = Array;
+    fn mul(self, rhs: &Array) -> Array {
+        Array::mul(self, rhs).expect("shape mismatch in *")
+    }
+}
+
+impl Div for &Array {
+    type Output = Array;
+    fn div(self, rhs: &Array) -> Array {
+        Array::div(self, rhs).expect("shape mismatch in /")
+    }
+}
+
 // ---------------------------------------------------------------------- tests
 // Spec tests: fail on todo!(), go green per milestone. M4 tests stay red while
 // add/sub/mul/div are still equal-shape-only — that's the expected order.
@@ -109,6 +143,16 @@ mod tests {
         assert_eq!(a.sub(&b).unwrap().get(&[0]), Some(6.0));
         assert_eq!(a.mul(&b).unwrap().get(&[1]), Some(18.0));
         assert_eq!(a.div(&b).unwrap().get(&[1]), Some(2.0));
+    }
+
+    #[test]
+    fn operator_sugar() {
+        let a = arr(&[1.0, 2.0], &[2]);
+        let b = arr(&[3.0, 4.0], &[2]);
+        let c = &a + &b;
+        assert_eq!(c.get(&[1]), Some(6.0));
+        let d = &c * &a;
+        assert_eq!(d.get(&[1]), Some(12.0));
     }
 
     #[test]
