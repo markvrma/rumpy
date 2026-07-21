@@ -110,6 +110,34 @@ impl Div for &Array {
     }
 }
 
+// ------------------------------------------------------------- M5: reductions
+
+impl Array {
+    /// Sum of all elements. Empty array sums to 0.0, like NumPy.
+    pub fn sum(&self) -> f64 {
+        // plain left-to-right sum. numpy pairwise-sums to keep error down on
+        // big arrays; noted as a known difference, not fixed here.
+        self.data.iter().sum()
+    }
+
+    /// Mean of all elements. Empty array → NaN (NumPy warns and returns NaN).
+    pub fn mean(&self) -> f64 {
+        // empty falls out on its own: 0.0 / 0.0 is nan, which is what we want
+        self.sum() / self.data.len() as f64
+    }
+
+    /// Smallest element, `None` when empty.
+    /// NaN handling: NumPy's `min` propagates NaN; document what yours does.
+    pub fn min(&self) -> Option<f64> {
+        self.data.iter().copied().reduce(f64::min)
+    }
+
+    /// Largest element, `None` when empty.
+    pub fn max(&self) -> Option<f64> {
+        self.data.iter().copied().reduce(f64::max)
+    }
+}
+
 // ---------------------------------------------------------------------- tests
 // Spec tests: fail on todo!(), go green per milestone. M4 tests stay red while
 // add/sub/mul/div are still equal-shape-only — that's the expected order.
@@ -178,5 +206,16 @@ mod tests {
             a.add(&b),
             Err(ShapeError::Incompatible { .. })
         ));
+    }
+
+    // ------------------------------------------------------------------- M5
+
+    #[test]
+    fn full_reductions() {
+        let a = arr(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], &[2, 3]);
+        assert_close(a.sum(), 21.0, EPS);
+        assert_close(a.mean(), 3.5, EPS);
+        assert_eq!(a.min(), Some(1.0));
+        assert_eq!(a.max(), Some(6.0));
     }
 }
