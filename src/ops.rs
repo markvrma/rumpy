@@ -7,6 +7,36 @@
 use crate::{Array, ShapeError};
 use std::ops::{Add, Div, Mul, Sub};
 
+// ------------------------------------------------------------ M4: broadcasting
+
+/// The broadcast result shape of two shapes, per NumPy's rules: align shapes
+/// right-to-left; dimensions match if equal or either is 1; missing leading
+/// dimensions count as 1. `Incompatible` otherwise.
+///
+/// Spec: https://numpy.org/doc/stable/user/basics.broadcasting.html
+pub fn broadcast_shape(a: &[usize], b: &[usize]) -> Result<Vec<usize>, ShapeError> {
+    let ndim = a.len().max(b.len());
+    let (pad_a, pad_b) = (ndim - a.len(), ndim - b.len());
+    let mut out = Vec::with_capacity(ndim);
+    for axis in 0..ndim {
+        // shapes align on the right, so anything off the front is a virtual 1
+        let da = if axis < pad_a { 1 } else { a[axis - pad_a] };
+        let db = if axis < pad_b { 1 } else { b[axis - pad_b] };
+        out.push(match (da, db) {
+            (x, y) if x == y => x,
+            (1, y) => y,
+            (x, 1) => x,
+            _ => {
+                return Err(ShapeError::Incompatible {
+                    a: a.to_vec(),
+                    b: b.to_vec(),
+                })
+            }
+        });
+    }
+    Ok(out)
+}
+
 /// m3 version: shapes have to match exactly. broadcasting is m4's problem.
 fn zip_same(a: &Array, b: &Array, f: impl Fn(f64, f64) -> f64) -> Result<Array, ShapeError> {
     if a.shape != b.shape {
@@ -219,6 +249,17 @@ mod tests {
             a.add(&b),
             Err(ShapeError::Incompatible { .. })
         ));
+    }
+
+    // ------------------------------------------------------------------- M4
+
+    #[test]
+    fn broadcast_shape_rules() {
+        assert_eq!(broadcast_shape(&[3, 1], &[1, 4]).unwrap(), vec![3, 4]);
+        assert_eq!(broadcast_shape(&[2, 3], &[3]).unwrap(), vec![2, 3]);
+        assert_eq!(broadcast_shape(&[5], &[5]).unwrap(), vec![5]);
+        assert_eq!(broadcast_shape(&[2, 1, 4], &[3, 1]).unwrap(), vec![2, 3, 4]);
+        assert!(broadcast_shape(&[2, 3], &[4]).is_err());
     }
 
     // ------------------------------------------------------------------- M5

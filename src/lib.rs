@@ -8,6 +8,7 @@ mod array;
 mod ops;
 
 pub use array::Array;
+pub use ops::broadcast_shape;
 
 use std::fmt;
 
