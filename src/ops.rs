@@ -59,21 +59,24 @@ pub(crate) fn broadcast_strides(
     out
 }
 
-/// m3 version: shapes have to match exactly. broadcasting is m4's problem.
-fn zip_same(a: &Array, b: &Array, f: impl Fn(f64, f64) -> f64) -> Result<Array, ShapeError> {
-    if a.shape != b.shape {
-        return Err(ShapeError::Incompatible {
-            a: a.shape.clone(),
-            b: b.shape.clone(),
-        });
+/// the shared guts of add/sub/mul/div: broadcast both sides, then walk the
+/// output once applying `f`. only the closure differs between the four.
+fn zip_with(a: &Array, b: &Array, f: impl Fn(f64, f64) -> f64) -> Result<Array, ShapeError> {
+    let out_shape = broadcast_shape(&a.shape, &b.shape)?;
+    let sa = broadcast_strides(&a.shape, &a.strides, &out_shape);
+    let sb = broadcast_strides(&b.shape, &b.strides, &out_shape);
+    let n: usize = out_shape.iter().product();
+
+    let mut data = Vec::with_capacity(n);
+    let mut idx = vec![0usize; out_shape.len()];
+    for _ in 0..n {
+        // same index, two different stride vectors -> two different elements
+        let oa: usize = idx.iter().zip(&sa).map(|(i, s)| i * s).sum();
+        let ob: usize = idx.iter().zip(&sb).map(|(i, s)| i * s).sum();
+        data.push(f(a.data[oa], b.data[ob]));
+        Array::next_index(&mut idx, &out_shape);
     }
-    let data: Vec<f64> = a
-        .data
-        .iter()
-        .zip(&b.data)
-        .map(|(&x, &y)| f(x, y))
-        .collect();
-    Array::from_vec(data, &a.shape)
+    Array::from_vec(data, &out_shape)
 }
 
 // ------------------------------------------------- M3 + M4: elementwise ops
@@ -87,24 +90,24 @@ impl Array {
     ///   multi-indices, and read each operand through its `broadcast_strides`.
     ///   No materialized copies.
     pub fn add(&self, rhs: &Array) -> Result<Array, ShapeError> {
-        zip_same(self, rhs, |x, y| x + y)
+        zip_with(self, rhs, |x, y| x + y)
     }
 
     /// Elementwise subtraction with broadcasting. Same plan as `add`.
     pub fn sub(&self, rhs: &Array) -> Result<Array, ShapeError> {
-        zip_same(self, rhs, |x, y| x - y)
+        zip_with(self, rhs, |x, y| x - y)
     }
 
     /// Elementwise multiplication with broadcasting. Same plan as `add`.
     pub fn mul(&self, rhs: &Array) -> Result<Array, ShapeError> {
-        zip_same(self, rhs, |x, y| x * y)
+        zip_with(self, rhs, |x, y| x * y)
     }
 
     /// Elementwise division with broadcasting. Same plan as `add`.
     /// Division by zero follows IEEE 754 (inf / NaN), same as NumPy.
     pub fn div(&self, rhs: &Array) -> Result<Array, ShapeError> {
         // no zero check: ieee754 already gives inf/nan, same as numpy
-        zip_same(self, rhs, |x, y| x / y)
+        zip_with(self, rhs, |x, y| x / y)
     }
 
     /// Add a scalar to every element. Infallible — no shapes to disagree.
