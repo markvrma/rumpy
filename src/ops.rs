@@ -37,6 +37,28 @@ pub fn broadcast_shape(a: &[usize], b: &[usize]) -> Result<Vec<usize>, ShapeErro
     Ok(out)
 }
 
+/// Logical strides for viewing a `shape`-shaped array (with `strides`) as
+/// `out_shape`: prepend to align, and set the stride to **0** on every
+/// broadcast dimension. Stride 0 means "moving along this axis revisits the
+/// same element" — this is exactly how NumPy broadcasts without copying data.
+pub(crate) fn broadcast_strides(
+    shape: &[usize],
+    strides: &[usize],
+    out_shape: &[usize],
+) -> Vec<usize> {
+    let pad = out_shape.len() - shape.len();
+    // padded-in leading axes keep stride 0: they don't exist in the source
+    let mut out = vec![0usize; out_shape.len()];
+    for axis in 0..shape.len() {
+        // a stretched axis (1 -> n) gets stride 0 so stepping along it stays
+        // parked on the same element. no copy, that's the whole point.
+        if shape[axis] == out_shape[pad + axis] {
+            out[pad + axis] = strides[axis];
+        }
+    }
+    out
+}
+
 /// m3 version: shapes have to match exactly. broadcasting is m4's problem.
 fn zip_same(a: &Array, b: &Array, f: impl Fn(f64, f64) -> f64) -> Result<Array, ShapeError> {
     if a.shape != b.shape {
