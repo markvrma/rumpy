@@ -129,12 +129,25 @@ impl Array {
     /// Smallest element, `None` when empty.
     /// NaN handling: NumPy's `min` propagates NaN; document what yours does.
     pub fn min(&self) -> Option<f64> {
-        self.data.iter().copied().reduce(f64::min)
+        // f64::min would quietly skip nan, so check first: we propagate like numpy
+        self.data.iter().copied().reduce(|acc, x| {
+            if acc.is_nan() || x.is_nan() {
+                f64::NAN
+            } else {
+                acc.min(x)
+            }
+        })
     }
 
     /// Largest element, `None` when empty.
     pub fn max(&self) -> Option<f64> {
-        self.data.iter().copied().reduce(f64::max)
+        self.data.iter().copied().reduce(|acc, x| {
+            if acc.is_nan() || x.is_nan() {
+                f64::NAN
+            } else {
+                acc.max(x)
+            }
+        })
     }
 }
 
