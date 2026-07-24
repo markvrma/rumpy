@@ -287,6 +287,28 @@ mod tests {
         assert!(broadcast_shape(&[2, 3], &[4]).is_err());
     }
 
+    #[test]
+    fn broadcast_add_column_times_row() {
+        // [[0], [10], [20]] + [[1, 2, 3, 4]] → 3x4, NumPy's canonical example.
+        let col = arr(&[0.0, 10.0, 20.0], &[3, 1]);
+        let row = arr(&[1.0, 2.0, 3.0, 4.0], &[1, 4]);
+        let c = col.add(&row).unwrap();
+        assert_eq!(c.shape(), &[3, 4]);
+        assert_eq!(c.get(&[0, 0]), Some(1.0));
+        assert_eq!(c.get(&[1, 2]), Some(13.0));
+        assert_eq!(c.get(&[2, 3]), Some(24.0));
+    }
+
+    #[test]
+    fn broadcast_add_missing_leading_dim() {
+        // [2,3] + [3]: the 1-d row is added to every row of the matrix.
+        let m = arr(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], &[2, 3]);
+        let v = arr(&[10.0, 20.0, 30.0], &[3]);
+        let c = m.add(&v).unwrap();
+        assert_eq!(c.get(&[0, 0]), Some(11.0));
+        assert_eq!(c.get(&[1, 2]), Some(36.0));
+    }
+
     // ------------------------------------------------------------------- M5
 
     #[test]
