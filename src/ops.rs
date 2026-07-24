@@ -204,6 +204,25 @@ impl Array {
             }
         })
     }
+
+    /// Sum along one axis; the result drops that axis (no keepdims — see
+    /// README gaps). E.g. `[2, 3]` summed over axis 0 → shape `[3]`.
+    pub fn sum_axis(&self, axis: usize) -> Result<Array, ShapeError> {
+        let ndim = self.shape.len();
+        if axis >= ndim {
+            return Err(ShapeError::AxisOutOfBounds { axis, ndim });
+        }
+        // 2-d only for now: walk rows and cols and add into the surviving axis
+        let (rows, cols) = (self.shape[0], self.shape[1]);
+        let mut out = Array::zeros(&[if axis == 0 { cols } else { rows }]);
+        for i in 0..rows {
+            for j in 0..cols {
+                let slot = if axis == 0 { j } else { i };
+                out.data[slot] += self.data[i * cols + j];
+            }
+        }
+        Ok(out)
+    }
 }
 
 // ---------------------------------------------------------------------- tests
@@ -327,5 +346,18 @@ mod tests {
         assert!(a.mean().is_nan());
         assert_eq!(a.min(), None);
         assert_eq!(a.max(), None);
+    }
+
+    #[test]
+    fn sum_axis_2d() {
+        let a = arr(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], &[2, 3]);
+        let s0 = a.sum_axis(0).unwrap(); // column sums
+        assert_eq!(s0.shape(), &[3]);
+        assert_close(s0.get(&[0]).unwrap(), 5.0, EPS);
+        assert_close(s0.get(&[2]).unwrap(), 9.0, EPS);
+        let s1 = a.sum_axis(1).unwrap(); // row sums
+        assert_eq!(s1.shape(), &[2]);
+        assert_close(s1.get(&[0]).unwrap(), 6.0, EPS);
+        assert_close(s1.get(&[1]).unwrap(), 15.0, EPS);
     }
 }
