@@ -360,4 +360,13 @@ mod tests {
         assert_close(s1.get(&[0]).unwrap(), 6.0, EPS);
         assert_close(s1.get(&[1]).unwrap(), 15.0, EPS);
     }
+
+    #[test]
+    fn axis_out_of_bounds() {
+        let a = Array::zeros(&[2, 3]);
+        assert_eq!(
+            a.sum_axis(2).unwrap_err(),
+            ShapeError::AxisOutOfBounds { axis: 2, ndim: 2 }
+        );
+    }
 }
