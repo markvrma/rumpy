@@ -212,13 +212,26 @@ impl Array {
         if axis >= ndim {
             return Err(ShapeError::AxisOutOfBounds { axis, ndim });
         }
-        // 2-d only for now: walk rows and cols and add into the surviving axis
-        let (rows, cols) = (self.shape[0], self.shape[1]);
-        let mut out = Array::zeros(&[if axis == 0 { cols } else { rows }]);
-        for i in 0..rows {
-            for j in 0..cols {
-                let slot = if axis == 0 { j } else { i };
-                out.data[slot] += self.data[i * cols + j];
+        // output is the same shape with that one axis deleted
+        let mut out_shape = self.shape.clone();
+        out_shape.remove(axis);
+        let mut out = Array::zeros(&out_shape);
+        if self.data.is_empty() {
+            return Ok(out);
+        }
+
+        // walk every element of self, drop the axis coord, add it into that slot.
+        // works for any ndim, which the 3d middle-axis test is there to check.
+        let mut idx = vec![0usize; ndim];
+        let mut dst = vec![0usize; out_shape.len()];
+        loop {
+            dst.clear();
+            dst.extend(idx.iter().enumerate().filter(|(a, _)| *a != axis).map(|(_, &i)| i));
+            let src = self.offset(&idx).unwrap();
+            let slot = out.offset(&dst).unwrap();
+            out.data[slot] += self.data[src];
+            if !Array::next_index(&mut idx, &self.shape) {
+                break;
             }
         }
         Ok(out)
@@ -359,6 +372,22 @@ mod tests {
         assert_eq!(s1.shape(), &[2]);
         assert_close(s1.get(&[0]).unwrap(), 6.0, EPS);
         assert_close(s1.get(&[1]).unwrap(), 15.0, EPS);
+    }
+
+    #[test]
+    fn sum_axis_3d_middle_axis() {
+        // shape [2,3,2], values 1..=12 in C-order; summing axis 1 collapses
+        // the middle: out[i][k] = sum over j of a[i][j][k].
+        let a = arr(
+            &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0],
+            &[2, 3, 2],
+        );
+        let s = a.sum_axis(1).unwrap();
+        assert_eq!(s.shape(), &[2, 2]);
+        assert_close(s.get(&[0, 0]).unwrap(), 9.0, EPS); // 1+3+5
+        assert_close(s.get(&[0, 1]).unwrap(), 12.0, EPS); // 2+4+6
+        assert_close(s.get(&[1, 0]).unwrap(), 27.0, EPS); // 7+9+11
+        assert_close(s.get(&[1, 1]).unwrap(), 30.0, EPS); // 8+10+12
     }
 
     #[test]
