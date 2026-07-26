@@ -54,6 +54,28 @@ pub fn matmul_naive(a: &Array, b: &Array) -> Result<Array, ShapeError> {
     Ok(out)
 }
 
+/// Same product, i-k-j loop order: the innermost loop walks `b` and the
+/// output along *rows* — contiguous memory, cache-friendly. Same O(m·k·n)
+/// arithmetic, several times faster. Measure it, don't take it on faith.
+pub fn matmul_ikj(a: &Array, b: &Array) -> Result<Array, ShapeError> {
+    let (m, k, n) = dims(a, b)?;
+    let mut out = Array::zeros(&[m, n]);
+    // same multiplies, different order. j moved to the inside, so the inner
+    // loop scans one row of b and one row of out straight through — every
+    // cache line that gets pulled in is fully used before the next one.
+    for i in 0..m {
+        for p in 0..k {
+            let aip = a.data[i * k + p];
+            // hoisted so the inner loop is two adjacent walks and an fma
+            let (row_b, row_c) = (p * n, i * n);
+            for j in 0..n {
+                out.data[row_c + j] += aip * b.data[row_b + j];
+            }
+        }
+    }
+    Ok(out)
+}
+
 // ---------------------------------------------------------------------- tests
 
 #[cfg(test)]

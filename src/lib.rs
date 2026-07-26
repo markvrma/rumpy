@@ -9,7 +9,7 @@ mod linalg;
 mod ops;
 
 pub use array::Array;
-pub use linalg::matmul_naive;
+pub use linalg::{matmul_ikj, matmul_naive};
 pub use ops::broadcast_shape;
 
 use std::fmt;
