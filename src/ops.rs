@@ -236,6 +236,16 @@ impl Array {
         }
         Ok(out)
     }
+
+    /// Mean along one axis; same shape rule as `sum_axis`.
+    pub fn mean_axis(&self, axis: usize) -> Result<Array, ShapeError> {
+        // the divisor is how long the axis we collapsed was
+        let n = *self.shape.get(axis).ok_or(ShapeError::AxisOutOfBounds {
+            axis,
+            ndim: self.shape.len(),
+        })? as f64;
+        Ok(self.sum_axis(axis)?.map(|x| x / n))
+    }
 }
 
 // ---------------------------------------------------------------------- tests
@@ -388,6 +398,13 @@ mod tests {
         assert_close(s.get(&[0, 1]).unwrap(), 12.0, EPS); // 2+4+6
         assert_close(s.get(&[1, 0]).unwrap(), 27.0, EPS); // 7+9+11
         assert_close(s.get(&[1, 1]).unwrap(), 30.0, EPS); // 8+10+12
+    }
+
+    #[test]
+    fn mean_axis_2d() {
+        let a = arr(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], &[2, 3]);
+        let m = a.mean_axis(0).unwrap();
+        assert_close(m.get(&[1]).unwrap(), 3.5, EPS); // (2+5)/2
     }
 
     #[test]
