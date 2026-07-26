@@ -5,9 +5,11 @@
 //! See README.md for the roadmap and reading list.
 
 mod array;
+mod linalg;
 mod ops;
 
 pub use array::Array;
+pub use linalg::matmul_naive;
 pub use ops::broadcast_shape;
 
 use std::fmt;
