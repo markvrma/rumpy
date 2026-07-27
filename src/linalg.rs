@@ -130,4 +130,25 @@ mod tests {
             Err(ShapeError::Incompatible { .. })
         ));
     }
+
+    #[test]
+    fn naive_and_ikj_agree() {
+        // Deterministic pseudo-random 16x16 (tiny LCG — no rand crate).
+        let mut state: u64 = 42;
+        let mut next = move || {
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (state >> 33) as f64 / (1u64 << 31) as f64 - 0.5
+        };
+        let data_a: Vec<f64> = (0..256).map(|_| next()).collect();
+        let data_b: Vec<f64> = (0..256).map(|_| next()).collect();
+        let a = arr(&data_a, &[16, 16]);
+        let b = arr(&data_b, &[16, 16]);
+        let c1 = matmul_naive(&a, &b).unwrap();
+        let c2 = matmul_ikj(&a, &b).unwrap();
+        for i in 0..16 {
+            for j in 0..16 {
+                assert_close(c1.get(&[i, j]).unwrap(), c2.get(&[i, j]).unwrap(), EPS);
+            }
+        }
+    }
 }
