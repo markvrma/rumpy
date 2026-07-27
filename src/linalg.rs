@@ -90,6 +90,33 @@ mod tests {
     }
 
     #[test]
+    fn matmul_known_product() {
+        // [[1, 2, 3],    [[7,  8],      [[ 58,  64],
+        //  [4, 5, 6]]  x  [9, 10],   =   [139, 154]]
+        //                 [11, 12]]
+        let a = arr(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], &[2, 3]);
+        let b = arr(&[7.0, 8.0, 9.0, 10.0, 11.0, 12.0], &[3, 2]);
+        for f in [matmul_naive, matmul_ikj] {
+            let c = f(&a, &b).unwrap();
+            assert_eq!(c.shape(), &[2, 2]);
+            assert_close(c.get(&[0, 0]).unwrap(), 58.0, EPS);
+            assert_close(c.get(&[0, 1]).unwrap(), 64.0, EPS);
+            assert_close(c.get(&[1, 0]).unwrap(), 139.0, EPS);
+            assert_close(c.get(&[1, 1]).unwrap(), 154.0, EPS);
+        }
+    }
+
+    #[test]
+    fn matmul_identity() {
+        let a = arr(&[1.0, 2.0, 3.0, 4.0], &[2, 2]);
+        let mut i2 = Array::zeros(&[2, 2]);
+        *i2.get_mut(&[0, 0]).unwrap() = 1.0;
+        *i2.get_mut(&[1, 1]).unwrap() = 1.0;
+        assert_eq!(matmul_naive(&a, &i2).unwrap(), a);
+        assert_eq!(matmul_ikj(&i2, &a).unwrap(), a);
+    }
+
+    #[test]
     fn matmul_shape_mismatch() {
         let a = Array::zeros(&[2, 3]);
         let b = Array::zeros(&[4, 2]); // inner dims 3 vs 4
