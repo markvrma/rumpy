@@ -62,6 +62,17 @@ pub(crate) fn broadcast_strides(
 /// the shared guts of add/sub/mul/div: broadcast both sides, then walk the
 /// output once applying `f`. only the closure differs between the four.
 fn zip_with(a: &Array, b: &Array, f: impl Fn(f64, f64) -> f64) -> Result<Array, ShapeError> {
+    // fast path: same shape means both flat buffers line up 1:1, no index math
+    if a.shape == b.shape {
+        let data: Vec<f64> = a
+            .data
+            .iter()
+            .zip(&b.data)
+            .map(|(&x, &y)| f(x, y))
+            .collect();
+        return Array::from_vec(data, &a.shape);
+    }
+
     let out_shape = broadcast_shape(&a.shape, &b.shape)?;
     let sa = broadcast_strides(&a.shape, &a.strides, &out_shape);
     let sb = broadcast_strides(&b.shape, &b.strides, &out_shape);
